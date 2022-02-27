@@ -112,6 +112,8 @@ packages_extra_utilities:
   - python-neovim
   - rar
   - screenkey
+  - task
+  - taskopen
   - thefuck
   - wavemon
   - wmctrl
