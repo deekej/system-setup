@@ -1,0 +1,488 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the system-config role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/system-config
+
+# -----------------------------------------------------------------------------
+
+- name: Check if GIT repository exists in /etc
+  stat:
+    path:       /etc/.git/
+  register:     git_status
+
+- name: Check if etckeeper has been initialized in /etc
+  stat:
+    path:       /etc/.etckeeper
+  register:     etckeeper_status
+
+- name: Set the etc_init fact
+  set_fact:
+    etc_init:   "{{ not git_status.stat.exists }}"
+
+- name: Set the etckeeper_init fact
+  set_fact:
+    etckeeper_init: "{{ not etckeeper_status.stat.exists }}"
+
+- name: Initialize .git repository in /etc folder
+  shell:        git init
+  args:
+    chdir:      /etc
+  register:     git_init
+  changed_when: "'Initialized empty Git repository' in git_init.stdout"
+  when:         etc_init|bool
+
+- name: Copy the .gitignore file into /etc
+  copy:
+    src:        files/etc/.gitignore
+    dest:       /etc/.gitignore
+    owner:      root
+    group:      root
+    mode:       0644
+  when:         etc_init|bool
+
+- name: Set the git user.name for etckeeper in /etc
+  shell:        cat .git/config && git config user.name "{{ etckeeper_git_name }}"
+  args:
+    chdir:      /etc
+  register:     git_name
+  changed_when: 'etckeeper_git_name|string not in git_name.stdout'
+  when:         etc_init|bool
+
+- name: Set the git user.email for etckeeper in /etc
+  shell:        cat .git/config && git config user.email "{{ etckeeper_git_email }}"
+  args:
+    chdir:      /etc
+  register:     git_email
+  changed_when: 'etckeeper_git_email|string not in git_email.stdout'
+  when:         etc_init|bool
+
+- name: Create first commit with the .gitignore file
+  shell:        git add .gitignore && git commit -m ".gitignore for etckeeper added"
+  args:
+    chdir:      /etc
+  register:     git_ignore
+  failed_when:  git_ignore.rc not in [0,1]
+  changed_when:
+    - "'nothing to commit' not in git_ignore.stdout"
+    - "'no changes added to commit' not in git_ignore.stdout"
+  when:         etc_init|bool
+
+- name: Create initial commit of configuration in /etc with etckeeper
+  shell:        etckeeper init && etckeeper commit "Initial commit of /etc configuration"
+  register:     etckeeper_commit
+  failed_when:  etckeeper_commit.rc not in [0,1]
+  changed_when:
+    - "'nothing to commit' not in etckeeper_commit.stdout"
+    - "'no changes added to commit' not in etckeeper_commit.stdout"
+  when:         etckeeper_init
+
+# -----------------------------------------------------------------------------
+
+- name: Make sure the Cloudflare's NTS service is used for NTP
+  lineinfile:
+    path:     /etc/chrony.conf
+    owner:    root
+    group:    root
+    mode:     0644
+    regexp:   '^pool .* iburst .*$'
+    line:     pool time.cloudflare.com iburst nts
+
+# -----------------------------------------------------------------------------
+
+- name: Generate salted password hash for root
+  shell: echo "{{ root_password_plain }}" | mkpasswd --method=yescrypt --stdin
+  register: mkpasswd_reg
+
+- name: Store the salted password hash into variable
+  set_fact:
+    root_password_hash: "{{ mkpasswd_reg.stdout }}"
+
+- name: Update login shell & password for the root user
+  user:
+    name:             root
+    shell:            "{{ root_login_shell }}"
+    password:         "{{ root_password_hash }}"
+    update_password:  always
+
+- name: Lock the login with password for the root user
+  user:
+    name:             root
+    password_lock:    "{{ root_password_lock | bool | ternary('yes', 'False') }}"
+
+# -----------------------------------------------------------------------------
+
+- name: Prohibit SSH login with password for the root user
+  lineinfile:
+    path:       /etc/ssh/sshd_config
+    regexp:     '^#PermitRootLogin .*$'
+    line:       PermitRootLogin prohibit-password
+
+- name: Create the /root/.ssh directory
+  file:
+    path:       /root/.ssh
+    state:      directory
+    owner:      root
+    group:      root
+    mode:       0700
+
+- name: Copy SSH configuration into /home folder of root user
+  copy:
+    src:        "{{ item.src }}"
+    dest:       "{{ item.dest }}"
+    mode:       "{{ item.mode }}"
+    owner:      root
+    group:      root
+  with_items:
+    - src:      files/ssh/config
+      dest:     /root/.ssh/config
+      mode:     '0600'
+
+    - src:      files/ssh/ssh_config
+      dest:     /root/.ssh/ssh_config
+      mode:     '0600'
+
+    - src:      vault/id_rsa
+      dest:     /root/.ssh/id_rsa
+      mode:     '0600'
+
+    - src:      vault/id_rsa.pub
+      dest:     /root/.ssh/id_rsa.pub
+      mode:     '0644'
+
+- name: Load the SSH public key into Ansible variable
+  set_fact:
+    ssh_pubkey: "{{ lookup('file', 'vault/id_rsa.pub') }}"
+
+- name: Make sure we are able to SSH to this machine via root & SSH key
+  lineinfile:
+    path:         /root/.ssh/authorized_keys
+    owner:        root
+    group:        root
+    mode:         0600
+    create:       yes
+    line:         "{{ ssh_pubkey }}"
+    insertbefore: BOF
+
+- name: Make sure the /root/.ssh/ folder has correct permissions
+  file:
+    path:         /root/.ssh
+    state:        directory
+    owner:        root
+    group:        root
+    mode:         0700
+
+- name: Make sure the SELinux context is properly set for /root folder
+  command:        restorecon -RvF /root
+
+- name: Enable SSH daemon to allow controlling of this machine via remote Ansible Controller
+  systemd:
+    name:       sshd.service
+    state:      started
+    enabled:    yes
+
+# -----------------------------------------------------------------------------
+
+- name: Enable passwordless sudo for the members of 'wheel' group
+  copy:
+    src:        files/sudoers.d/admins
+    dest:       /etc/sudoers.d/admins
+    owner:      root
+    group:      root
+    mode:       0440
+  when:         passwordless_sudo
+
+# -----------------------------------------------------------------------------
+
+- name: Initialize Snapper for the /home directory
+  command:      snapper -c '{{ username }}' create-config '/var/home/{{ username }}'
+  register:     snapper_init
+  changed_when:
+    - snapper_init.rc == 0
+    - snapper_init.stdout == ""
+  failed_when:
+    - snapper_init.rc != 0
+    - "'subvolume already covered' not in snapper_init.stderr"
+
+- name: Copy custom Snapper configuration for the /home directory into /etc
+  template:
+    src:    templates/snapper-home.j2
+    dest:   /etc/snapper/configs/{{username}}
+    owner:  root
+    group:  root
+    mode:   0640
+
+- name: Enable and start the timer units for the Snapper
+  systemd:
+    name:     "{{ item }}"
+    state:    started
+    enabled:  yes
+  with_items:
+    - snapper-timeline.timer
+    - snapper-cleanup.timer
+
+# -----------------------------------------------------------------------------
+
+- name: Set the system locale to {{ locale_LANG }}
+  lineinfile:
+    path:       /etc/locale.conf
+    regexp:     '^LANG=.*$'
+    line:       'LANG="{{ locale_LANG }}"'
+
+- name: Set the LC_TIME locale to {{ locale_LC_TIME }}
+  lineinfile:
+    path:       /etc/locale.conf
+    regexp:     '^LC_TIME=.*$'
+    line:       'LC_TIME="{{ locale_LC_TIME }}"'
+  when:         locale_LC_TIME != 'None'
+
+# -----------------------------------------------------------------------------
+
+- name: Speedup the boot time of the system (no waiting for network to be online)
+  systemd:
+    name:       NetworkManager-wait-online.service
+    state:      stopped
+    enabled:    no
+
+# -----------------------------------------------------------------------------
+
+#- name: Enable automatic PowertTOP autotuner to save battery life
+#  systemd:
+#    name:       powertop.service
+#    state:      started
+#    enabled:    yes
+
+- name: Copy custom service to fix Keychron Keyboard keys
+  copy:
+    src:        files/systemd/keychron-keyboard-fix.service
+    dest:       /etc/systemd/system/keychron-keyboard-fix.service
+    owner:      root
+    group:      root
+    mode:       0644
+
+- name: Enable the keychron-keyboad-fix.service
+  systemd:
+    name:           keychron-keyboard-fix.service
+    state:          started
+    enabled:        yes
+    daemon_reload:  yes
+
+- name: Copy Thinkfan configuration for custom laptop's fan curve
+  copy:
+    src:        files/etc/thinkfan.conf
+    dest:       /etc/thinkfan.conf
+    owner:      root
+    group:      root
+    mode:       0644
+  when:         laptop_config
+
+- name: Run automatic sensors-detect to enable Thinkfan functionality
+  command:      sensors-detect --auto
+  when:         laptop_config
+
+- name: Load the necessary kernel modules identified by the sensors-detect
+  systemd:
+    name:       systemd-modules-load
+    state:      restarted
+  when:         laptop_config
+
+- name: Enable & start the Thinkfan systemd service
+  systemd:
+    name:       thinkfan
+    state:      started
+    enabled:    yes
+  when:         laptop_config
+
+# NOTE: In case of issues with Thinkfan service it might be necessary to follow
+#       the troubleshooting section described here:
+#       https://gist.github.com/abn/de81ba413f860b00c2db3ee4aa83e035
+#
+#       In case of other issues with Thinkpad laptops follow:
+#       https://wiki.archlinux.org/title/Lenovo_ThinkPad_X1_Carbon_(Gen_5)
+
+# -----------------------------------------------------------------------------
+
+- name: Create /etc/ipa directory
+  file:
+    path:       /etc/ipa
+    state:      directory
+    owner:      root
+    group:      root
+    mode:       0755
+
+- name: Copy Red Hat's internal certificates into /etc
+  copy:
+    src:        "{{ item.src }}"
+    dest:       "{{ item.dest }}"
+    owner:      root
+    group:      root
+    mode:       0644
+  with_items:
+    - src:    files/certs/ipa.crt
+      dest:   /etc/ipa/ipa.crt
+
+    - src:    files/certs/redhat-legacy.crt
+      dest:   /etc/pki/ca-trust/source/anchors/redhat-legacy.crt
+
+    - src:    files/certs/redhat-legacy.pem
+      dest:   /etc/pki/ca-trust/source/anchors/redhat-legacy.pem
+
+    - src:    files/certs/redhat-root.crt
+      dest:   /etc/pki/ca-trust/source/anchors/redhat-root.crt
+
+    - src:    files/certs/redhat-root.pem
+      dest:   /etc/pki/ca-trust/source/anchors/redhat-root.pem
+
+    - src:    files/certs/Eng-CA.crt
+      dest:   /etc/pki/ca-trust/source/anchors/Eng-CA.crt
+
+    - src:    files/certs/RH_ITW.crt
+      dest:   /etc/pki/ca-trust/source/anchors/RH_ITW.crt
+
+    - src:    files/certs/oracle_ebs.crt
+      dest:   /etc/pki/ca-trust/source/anchors/oracle_ebs.crt
+
+    - src:    files/certs/win-intermediate-ca.cer
+      dest:   /etc/pki/ca-trust/source/anchors/win-intermediate-ca.cer
+  when:       redhat_work_config
+
+- name: Create additional symlinks for the Red Hat internal certificates
+  file:
+    src:      "{{ item.src }}"
+    dest:     "{{ item.dest }}"
+    owner:    root
+    group:    root
+    state:    link
+    force:    yes
+  with_items:
+    - src:    /etc/pki/ca-trust/source/anchors/redhat-legacy.crt
+      dest:   /etc/openldap/certs/redhat-legacy.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/redhat-root.crt
+      dest:   /etc/openldap/certs/redhat-root.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/redhat-legacy.crt
+      dest:   /etc/pki/tls/certs/newca.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/redhat-root.pem
+      dest:   /etc/pki/tls/certs/2015-RH-IT-Root-CA.pem
+
+    - src:    /etc/pki/ca-trust/source/anchors/Eng-CA.crt
+      dest:   /etc/pki/tls/certs/Eng-CA.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/RH_ITW.crt
+      dest:   /etc/pki/tls/certs/RH_ITW.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/oracle_ebs.crt
+      dest:   /etc/pki/tls/certs/oracle_ebs.crt
+
+    - src:    /etc/pki/ca-trust/source/anchors/win-intermediate-ca.cer
+      dest:   /etc/pki/tls/certs/win-intermediate-ca.cer
+  when:       redhat_work_config
+
+- name: Update the consolidated & dynamic configuration of CA certificates
+  command:    update-ca-trust
+  when:       redhat_work_config
+
+# -----------------------------------------------------------------------------
+
+- name: Copy Red Hat's Kerberos configuration files into /etc
+  copy:
+    src:      "{{ item.src }}"
+    dest:     "{{ item.dest }}"
+    owner:    root
+    group:    root
+    mode:     0644
+  with_items:
+    - src:    files/etc/krb5.conf
+      dest:   /etc/krb5.conf
+
+    - src:    files/krb5.conf.d/redhat_com
+      dest:   /etc/krb5.conf.d/redhat_com
+  when:       redhat_work_config
+
+- name: Copy Red Hat's Kerberos configuration file for Google Chrome into /etc
+  copy:
+    src:      files/google-chrome/redhat-corp.json
+    dest:     /etc/opt/chrome/policies/managed/redhat-corp.json
+    owner:    root
+    group:    root
+    mode:     0644
+  when:       redhat_work_config
+
+- name: Copy Red Hat's LDAP configuration file into /etc
+  copy:
+    src:      files/openldap/ldap.conf
+    dest:     /etc/openldap/ldap.conf
+    owner:    root
+    group:    root
+    mode:     0644
+  when:       redhat_work_config
+
+# -----------------------------------------------------------------------------
+
+- name: Copy Red Hat's VPN profiles into /etc
+  copy:
+    src:      "{{ item.src }}"
+    dest:     "{{ item.dest }}"
+    owner:    root
+    group:    root
+    mode:     0600
+  with_items:
+    - src:    files/vpn/redhat-vpn-amsterdam.nmconnection
+      dest:   "/etc/NetworkManager/system-connections/Red Hat | Amsterdam VPN.nmconnection"
+
+    - src:    files/vpn/redhat-vpn-brno.nmconnection
+      dest:   "/etc/NetworkManager/system-connections/Red Hat | Brno VPN.nmconnection"
+
+    - src:    files/vpn/redhat-vpn-global.nmconnection
+      dest:   "/etc/NetworkManager/system-connections/Red Hat | Global VPN.nmconnection"
+  when:       redhat_work_config
+
+- name: Load the new VPN profiles with NetworkManager
+  command:    nmcli connection reload
+  when:       redhat_work_config
+
+
+# -----------------------------------------------------------------------------
+
+#- name: Enable cups-browsed.service for printers on LDAP servers / legacy CUPS protocol
+#  systemd:
+#    name:     cups-browsed
+#    state:    started
+#    enabled:  yes
+#  when:       CUPS_on_LDAP_server
+
+# -----------------------------------------------------------------------------
+
+- name: Make the colored output of diff more readable
+  copy:
+    src:      files/etc/colordiffrc
+    dest:     /etc/colordiffrc
+    owner:    root
+    group:    root
+    mode:     0644
+  when:       colordiff_lighter
+
+# -----------------------------------------------------------------------------
+
+- name: Restore the SELinux context recursively for whole /etc folder
+  command:    restorecon -RvF /etc
+
+# -----------------------------------------------------------------------------
+
+- name: Create initial commit of configuration in /etc with etckeeper
+  shell:        etckeeper commit "Custom configuration added by Ansible"
+  register:     etckeeper_commit
+  failed_when:  etckeeper_commit.rc not in [0,1]
+  changed_when:
+    - "'nothing to commit' not in etckeeper_commit.stdout"
+    - "'no changes added to commit' not in etckeeper_commit.stdout"
+  when:         etckeeper_init
+
+# -----------------------------------------------------------------------------
+
+- name: Mark the system-config role as DONE
+  shell: echo 'DONE' > /etc/.setup/system-config
+

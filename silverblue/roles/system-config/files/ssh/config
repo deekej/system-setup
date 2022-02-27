@@ -1,0 +1,20 @@
+# Personal configuration file for SSH:
+# ####################################
+
+# Use compression:
+Compression=yes
+
+# github.com:
+# -----------
+Host github github.com
+  Hostname github.com
+  User=git
+  RequestTTY=no
+
+# gitlab.com:
+# -----------
+Host gitlab gitlab.com
+  Hostname gitlab.com
+  User=git
+  RequestTTY=no
+

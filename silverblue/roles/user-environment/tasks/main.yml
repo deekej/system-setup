@@ -1,0 +1,13 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+# Run only if /etc/.setup/user-environment is not yet DONE...
+- name: Check if the user environment is DONE
+  shell: cat /etc/.setup/user-environment 2> /dev/null || echo 'IN PROGRESS'
+  register: user_environment_status
+  changed_when: user_environment_status.stdout != 'DONE'
+
+- name: Run the user-environment role
+  include_tasks: user-environment.yml
+  when: user_environment_status.stdout != 'DONE'

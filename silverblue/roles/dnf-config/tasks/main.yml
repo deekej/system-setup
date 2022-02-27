@@ -1,0 +1,16 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Additional DNF repositories configuration
+#
+# Run only if /etc/.setup/dnf-config is not yet DONE...
+
+- name: Check if the DNF configuration is DONE
+  shell: cat /etc/.setup/dnf-config 2> /dev/null || echo 'IN PROGRESS'
+  register: dnf_config_status
+  changed_when: dnf_config_status.stdout != 'DONE'
+
+- name: Run the dnf-config role
+  include_tasks: run-config.yml
+  when: dnf_config_status.stdout != 'DONE'
+

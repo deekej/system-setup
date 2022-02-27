@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Wrapper to start the setup of fresh OS installation.
+#
+# NOTE: This script will have to be updated in the future to work correctly
+#       even when run on WSFL 2.0 (Windows)...
+
+source /etc/os-release
+
+# Parse the info we actually need:
+case "$(echo ${NAME} | tr '[:upper:]' '[:lower:]')" in
+  *linux*)
+    SYSTEM='linux'
+    ;;
+
+  *windows*)
+    SYSTEM='windows'
+    ;;
+
+  *macosx*)
+    SYSTEM='macosx'
+    ;;
+
+  *)
+    echo "[$(basename ${0})] ERROR: Not able to detect OS system. Terminating..." >&2
+    exit 2
+esac
+
+# Run the correct bootstrap script for current OS variant:
+case "${SYSTEM}" in
+  linux)
+    case "${VARIANT}" in
+      Silverblue)
+        cd silverblue
+        exec ./setup "${@}"
+        ;;
+
+      Workstation)
+        # TODO
+        ;;
+    esac
+    ;;
+
+  windows)
+    # TODO
+    ;;
+
+  macosx)
+    # TODO
+    ;;
+esac

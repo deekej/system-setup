@@ -1,0 +1,23 @@
+---
+# defaults file for roles/dnf-repos-configuration
+
+nVidia_repo:    fedora-nvidia.repo
+nVidia_drivers: false
+
+repos:
+  - fedora-rar.repo
+  - github.repo
+  - google-chrome.repo
+  - rpmfusion-free.repo
+  - rpmfusion-free-updates.repo
+  - rpmfusion-free-updates-testing.repo
+  - rpmfusion-nonfree.repo
+  - rpmfusion-nonfree-nvidia-driver.repo
+  - rpmfusion-nonfree-steam.repo
+  - rpmfusion-nonfree-updates.repo
+  - rpmfusion-nonfree-updates-testing.repo
+
+repos_gpg_keys:
+  - RPM-GPG-KEY-github
+  - RPM-GPG-KEY-slaanesh
+

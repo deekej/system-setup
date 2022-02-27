@@ -1,0 +1,16 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Disk partitions configuration:
+#
+# Run only if /etc/.setup/partitions-config is not yet DONE...
+
+- name: Check if the partitions configuration is DONE
+  shell: cat /etc/.setup/partitions-config 2> /dev/null || echo 'IN PROGRESS'
+  register: partitions_config_status
+  changed_when: partitions_config_status.stdout != 'DONE'
+
+- name: Run the partitions-config role
+  include_tasks: partitions-config.yml
+  when: partitions_config_status.stdout != 'DONE'
+

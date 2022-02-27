@@ -1,0 +1,284 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Shared configuration between all Fedora Silverblue installations
+
+# ---| Default User Configuration |--------------------------------------------
+display_name: Dee'Kej
+username:     deekej
+user_id:      117813
+group_id:     117813
+
+subuid_start: 10000
+subgid_start: 10000
+
+groups_membership:
+  - "{{ username }}"
+  - wheel
+
+# NOTE: Yes, I am using the same password on both latop & desktop. Sue me! :D
+user_login_shell:     /bin/zsh
+user_password_plain:  !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  63323738616265346632316139616562633830336539396239346130666661376665653062363865
+  6230343336656166353061366466333661613131333666620a396632643566373061653663386539
+  36623865353732613263373766336666356332396230383639623238613865343262613166623230
+  6139333939353339320a633931653133633534343434623032316434653363303530323963663636
+  3136
+
+root_login_shell:     /bin/zsh
+root_password_plain:  !vault |
+  $ANSIBLE_VAULT;1.1;AES256
+  63323738616265346632316139616562633830336539396239346130666661376665653062363865
+  6230343336656166353061366466333661613131333666620a396632643566373061653663386539
+  36623865353732613263373766336666356332396230383639623238613865343262613166623230
+  6139333939353339320a633931653133633534343434623032316434653363303530323963663636
+  3136
+
+# ---| Partitions Configuration |----------------------------------------------
+btrfs_subvolumes:
+  - "{{ username }}"
+  - "{{ username }}.backups"
+  - "{{ username }}.build"
+  - "{{ username }}.cache"
+  - "{{ username }}.devel"
+  - "{{ username }}.documents"
+  - "{{ username }}.downloads"
+  - "{{ username }}.dropbox"
+  - "{{ username }}.music"
+  - "{{ username }}.pictures"
+  - "{{ username }}.videos"
+
+btrfs_subvolumes_owner_only:
+  - "{{ username }}"
+  - "{{ username }}.backups"
+  - "{{ username }}.cache"
+
+btrfs_subvolumes_nodatacow:
+  - "{{ username }}.backups"
+  - "{{ username }}.build"
+  - "{{ username }}.cache"
+  - "{{ username }}.downloads"
+
+tmpfs_size:   8G
+
+# ---| Layered packages configuration |----------------------------------------
+base_packages_to_remove:
+  - gnome-terminal
+  - gnome-terminal-nautilus
+
+packages_to_remove:
+  - tlp
+  - tlp-rdw
+  - tuned
+
+packages_extra_user:
+  - nemo
+  - nemo-emblems
+  - nemo-extensions
+  - nemo-fileroller
+  - nemo-seahorse
+
+packages_extra_work:
+  - google-chrome-stable
+  - krb5-workstation
+  - openldap-clients
+  - pass
+  - pass-otp
+  - screen
+  - virt-manager
+  - wl-clipboard          # dependency for pass
+
+packages_extra_theme:
+  - arc-theme
+  - breeze-cursor-theme
+  - mint-y-icons
+
+packages_extra_codecs:
+  - ffmpeg
+  - gstreamer1-plugin-openh264
+  - gstreamer1-plugins-ugly
+
+packages_extra_plugins:
+  - webp-pixbuf-loader
+
+packages_extra_utilities:
+  - ascii
+  - autojump-zsh
+  - ctags
+  - fzf
+  - peek
+  - python-msgpack
+  - python-neovim
+  - rar
+  - screenkey
+  - thefuck
+  - wavemon
+  - wmctrl
+  - youtube-dl
+  - zsh
+  - zsh-autosuggestions
+  - zsh-lovers
+  - zsh-syntax-highlighting
+
+# ---| Flatpak packages configuration |----------------------------------------
+flatpak_packages_to_remove:
+  - com.gexperts.Tilix                      # Installed as RPM package instead
+
+# NOTE: In case of failure of flatpak packages installation, you might
+#       (most likely) need to specify which branch to use - after the slashes: //
+flatpak_packages_extra_user:
+  - com.spotify.Client                    # Music Streamer
+  - org.soundconverter.SoundConverter     # Sound Converter
+  - org.gnome.EasyTAG                     # ID3 editor for MP3
+  - org.gimp.GIMP                         # Graphical Editor
+  - org.inkscape.Inkscape                 # Vector Editor
+  - org.telegram.desktop                  # Instant Messaging App
+
+flatpak_packages_extra_work:
+  - im.riot.Riot                          # Element Instant Messaging App for Matrix
+  - io.github.Hexchat                     # IRC App
+  - org.mozilla.firefox                   # Second Firefox for a separate browsing profile
+
+# Runtimes for additional themes:
+flatpak_packages_extra_theme:
+  - org.gtk.Gtk3theme.Arc-Dark
+  - org.gtk.Gtk3theme.Arc-Darker
+  - org.gtk.Gtk3theme.Arc-Lighter
+
+# Codecs for VLC/Firefox in flatpak:
+flatpak_packages_extra_codecs:
+  - org.freedesktop.Platform.ffmpeg-full//21.08
+  - org.freedesktop.Platform.openh264//2.0
+
+flatpak_packages_extra_runtimes:
+  - org.telegram.desktop.webview
+
+# ---| System configuration |--------------------------------------------------
+etckeeper_git_name:   Dee'Kej
+etckeeper_git_email:  admin@deekej.io
+
+passwordless_sudo:    true
+
+laptop_config:        false
+redhat_work_config:   true
+CUPS_on_LDAP_server:  false
+
+# Start week on Monday:
+locale_LC_TIME:       en_GB.UTF-8
+
+# ---| Gnome configuration |---------------------------------------------------
+gnome_user:   "{{ username }}"
+gnome_extensions:
+  # https://extensions.gnome.org/extension/6/applications-menu/
+  - id:     6
+    enable: no
+
+  # https://extensions.gnome.org/extension/1604/arrange-windows/
+  - id:     1604
+    enable: no
+
+  # https://extensions.gnome.org/extension/751/audio-output-switcher/
+  - id:     751
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1401/bluetooth-quick-connect/
+  - id:     1401
+    enable: yes
+
+  # https://extensions.gnome.org/extension/3193/blur-my-shell/
+  - id:     3193
+    enable: yes
+
+  # https://extensions.gnome.org/extension/4679/burn-my-windows/
+  - id:     4679
+    enable: no
+
+  # https://extensions.gnome.org/extension/517/caffeine/
+  - id:     517
+    enable: yes
+
+  # https://extensions.gnome.org/extension/307/dash-to-dock/
+  - id:     307
+    enable: yes
+
+  # https://extensions.gnome.org/extension/4509/disable-unredirect-fullscreen-windows/
+  - id:     4509
+    enable: yes
+
+  # https://extensions.gnome.org/extension/3843/just-perfection/
+  - id:     3843
+    enable: no
+
+  # https://extensions.gnome.org/extension/36/lock-keys/
+  - id:     36
+    enable: yes
+
+  # https://extensions.gnome.org/extension/3100/maximize-to-empty-workspace/
+  - id:     3100
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1459/miniview/
+  - id:     1459
+    enable: yes
+
+  # https://extensions.gnome.org/extension/2182/noannoyance/
+  - id:     2182
+    enable: yes
+
+  # https://extensions.gnome.org/extension/708/panel-osd/
+  - id:     708
+    enable: no
+
+  # https://extensions.gnome.org/extension/8/places-status-indicator/
+  - id:     8
+    enable: yes
+
+  # https://extensions.gnome.org/extension/905/refresh-wifi-connections/
+  - id:     905
+    enable: yes
+
+  # https://extensions.gnome.org/extension/112/remove-accesibility/
+  - id:     112
+    enable: yes
+
+  # https://extensions.gnome.org/extension/3906/remove-app-menu/
+  - id:     3906
+    enable: yes
+
+  # https://extensions.gnome.org/extension/355/status-area-horizontal-spacing/
+  - id:     355
+    enable: yes
+
+  ## https://extensions.gnome.org/extension/120/system-monitor/
+  #- id:     120
+  #  enable: yes
+
+  # https://extensions.gnome.org/extension/701/top-panel-workspace-scroll/
+  - id:     701
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1446/transparent-window-moving/
+  - id:     1446
+    enable: yes
+
+  # https://extensions.gnome.org/extension/2890/tray-icons-reloaded/
+  - id:     2890
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1414/unblank/
+  - id:     1414
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1287/unite/
+  - id:     1287
+    enable: yes
+
+  # https://extensions.gnome.org/extension/1460/vitals/
+  - id:     1460
+    enable: no
+
+  # https://extensions.gnome.org/extension/1485/workspace-matrix/
+  - id:     1485
+    enable: no
+

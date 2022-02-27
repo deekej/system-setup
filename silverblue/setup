@@ -1,0 +1,89 @@
+#!/bin/bash
+
+PROG="$(basename ${0})"
+HOSTNAME="$(hostname)"
+FORCE=''
+
+ANSIBLE_COLL_PATH='.ansible/collections/ansible_collections'
+
+# Trap CTRL+C by cancelling rpm-ostree operation & exiting.
+# Otherwise we wouldn't be able to interrupt bootstrap easily...
+trap CTRL_C INT
+
+function CTRL_C {
+  rpm-ostree cancel
+  exit 1
+}
+
+# =============================================================================
+
+# Bootstrapping the system files requires elevated privileges:
+if [[ ${EUID} != 0 ]]; then
+  echo "[${PROG}] ERROR: elevated privileges are required" >&2
+  exit 1
+fi
+
+# We also need to know the hostname of the machine to run proper Ansible playbook:
+if [[ -z "${HOSTNAME}" || "${HOSTNAME}" == 'localhost' || "${HOSTNAME}" == 'fedora' ]]; then
+  HOSTNAME="${1}"
+
+  if [[ -z "${HOSTNAME}" ]]; then
+    echo "[${PROG}] ERROR: hostname for the machine is not set and was not supplied!" >&2
+    echo "[${PROG}] INFO: run this command again with hostname as an argument..." >&2
+    echo "[${PROG}] INFO: ./${PROG} <hostname>"
+    exit 1
+  else
+    hostnamectl hostname "${HOSTNAME}"
+  fi
+fi
+
+# Allow to start the boostrap process all over again:
+# (We are assuming the hostname is already set.)
+if [[ "${1}" == '-f' || "${1}" == '--force' ]]; then
+  rm -f /etc/.setup/bootstrap
+  FORCE="-e 'force=true'"
+fi
+
+if [[ -f /etc/.setup/bootstrap ]] && grep -q -i -e 'DONE' /etc/.setup/bootstrap; then
+  echo "[${PROG}] INFO: initial bootstrapping has finished" >&2
+  echo "[${PROG}] INFO: starting Ansible playbook..." >&2
+  exec ansible-playbook ${FORCE} --ask-vault-pass silverblue.yml
+  exit 0
+fi
+
+# =============================================================================
+
+mkdir -p /etc/.setup/
+echo 'IN PROGRESS' > /etc/.setup/bootstrap
+
+# Firstly, cancel any running rpm-ostree transaction:
+rpm-ostree cancel
+
+# Run the cleanup and update the machine, so the installation of Ansible
+# doesn't fail because of pending changes (updates).
+#
+# NOTE: Running rpm-ostree transactions immediately one after another can
+#       cause race-conditions when obtaining file locks, so we have to sleep.
+rpm-ostree cleanup    --repomd && sleep 5
+rpm-ostree refresh-md --force  && sleep 5
+rpm-ostree upgrade    --reboot && sleep 5
+
+# Install Ansible package, which we will later use to manage everything else:
+rpm-ostree install --idempotent ansible
+
+# Create default Ansible Collections folder for root & setup user:
+mkdir -p "/root/${ANSIBLE_COLL_PATH}"
+mkdir -p "/home/${SUDO_USER}/${ANSIBLE_COLL_PATH}"
+
+# Copy necessary Ansible collections into ~/.ansible folder:
+mkdir -p "/root/${ANSIBLE_COLL_PATH}/ansible/posix"
+cp -a collections/ansible.posix/. "/root/${ANSIBLE_COLL_PATH}/ansible/posix/."
+cp -a collections/ansible.posix/. "/home/${SUDO_USER}/${ANSIBLE_COLL_PATH}/ansible/posix/."
+
+echo "[${PROG}] INFO: Bootstrap is finished, system will reboot in 10 seconds." >&2
+echo "[${PROG}] INFO: Press <CTRL-C> to interrupt the reboot process..." >&2
+
+# Finalize the bootstrap & reboot:
+echo 'DONE' > /etc/.setup/bootstrap
+
+sleep 10 && systemctl reboot

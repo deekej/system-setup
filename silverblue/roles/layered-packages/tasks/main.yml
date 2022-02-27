@@ -1,0 +1,24 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Layered packages installation on top of base layer packages.
+
+# Run only if /etc/.setup/drivers-install is not yet DONE...
+- name: Check if the drivers installation is DONE
+  shell: cat /etc/.setup/drivers-install 2> /dev/null || echo 'NONE'
+  register: drivers_install_status
+  changed_when: (drivers_install_status.stdout != 'NONE') and (drivers_install_status.stdout != 'DONE')
+
+- name: Run the drivers-install sub-role
+  include_tasks: drivers-install.yml
+  when: (install_drivers | bool) and (drivers_install_status.stdout != 'DONE')
+
+# Run only if /etc/.setup/packages-install is not yet DONE...
+- name: Check if the layered packages installation is DONE
+  shell: cat /etc/.setup/packages-install 2> /dev/null || echo 'IN PROGRESS'
+  register: packages_install_status
+  changed_when: packages_install_status.stdout != 'DONE'
+
+- name: Run the packages-install sub-role
+  include_tasks: packages-install.yml
+  when: packages_install_status.stdout != 'DONE'

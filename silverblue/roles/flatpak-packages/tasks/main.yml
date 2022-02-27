@@ -1,0 +1,14 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Flatpak packages installation.
+
+# Run only if /etc/.setup/flatpak-install is not yet DONE...
+- name: Check if the Flatpak packages installation is DONE
+  shell: cat /etc/.setup/flatpak-packages 2> /dev/null || echo 'IN PROGRESS'
+  register: flatpak_packages_status
+  changed_when: flatpak_packages_status.stdout != 'DONE'
+
+- name: Run the flatpak-packages role
+  include_tasks: flatpak-packages.yml
+  when: flatpak_packages_status.stdout != 'DONE'

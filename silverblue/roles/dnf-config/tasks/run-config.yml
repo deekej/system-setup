@@ -1,0 +1,39 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Copy overrides / additional repositories into /etc/yum.repos.d/
+  copy:
+    src:    "files/{{ item }}"
+    dest:   "/etc/yum.repos.d/{{ item }}"
+    owner:  root
+    group:  root
+    mode:   0644
+  loop:     "{{ repos }}"
+
+- name: Copy nVidia drivers repo into /etc/yum.repos.d/
+  copy:
+    src:    "files/{{ nVidia_repo }}"
+    dest:   "/etc/yum.repos.d/{{ nVidia_repo }}"
+    owner:  root
+    group:  root
+    mode:   0644
+  when: nVidia_drivers | bool
+
+- name: Copy GPG keys for the repositories
+  copy:
+    src:    "files/{{ item }}"
+    dest:   "/etc/pki/rpm-gpg/{{ item }}"
+    owner:  root
+    group:  root
+    mode:   0644
+  loop:     "{{ repos_gpg_keys }}"
+
+- name: Restore SELinux context for files in /etc/yum.repos.d/
+  command: restorecon -F -R /etc/yum.repos.d
+
+- name: Restore SELinux context for files in /etc/pki/rpm-gpg/
+  command: restorecon -F -R /etc/pki/rpm-gpg
+
+- name: "Mark the dnf-config role as DONE"
+  shell: echo 'DONE' > /etc/.setup/dnf-config

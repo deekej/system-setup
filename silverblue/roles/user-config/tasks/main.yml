@@ -1,0 +1,16 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Primary user configuration
+#
+# Run only if /etc/.setup/user-config is not yet DONE...
+
+- name: Check if the user configuration is DONE
+  shell: cat /etc/.setup/user-config 2> /dev/null || echo 'IN PROGRESS'
+  register: user_config_status
+  changed_when: user_config_status.stdout != 'DONE'
+
+- name: Run the user-config role
+  include_tasks: user-config.yml
+  when: user_config_status.stdout != 'DONE'
+

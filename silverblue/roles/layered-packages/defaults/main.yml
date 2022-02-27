@@ -1,0 +1,71 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+packages_default:
+  - ansible
+  - colordiff
+  - dconf-editor
+  - etckeeper
+  - gh
+  - git
+  - git-lfs
+  - glances
+  - gnome-extensions-app
+  - gnome-shell-extension-gpaste
+  - gnome-shell-extension-openweather
+  - gnome-tweaks
+  - gpaste
+  - gpaste-ui
+  - guvcview
+  - htop
+  - powertop
+  - rmlint
+  - seahorse
+  - smartmontools
+  - snapper
+  - speedtest-cli
+  - terminator
+  - tilix
+  - vim
+  - vim-enhanced
+  - vim-X11
+  - xclip
+
+# In case someone doesn't want some of the default packages installed:
+packages_default_mask: []
+
+packages_extra_laptop:
+  - thinkfan
+
+# Additional packages that can be specified by the user:
+packages_extra_user: []
+packages_extra_work: []
+packages_extra_theme: []
+packages_extra_codecs: []
+packages_extra_plugins: []
+packages_extra_utilities: []
+
+# Packages to be force removed from the base layer (rpm-ostree override):
+base_packages_to_remove: []
+
+# Packages to be removed if previously installed by the user:
+packages_to_remove: []
+
+# -----------------------------------------------------------------------------
+
+install_drivers:                false
+drivers_nVidia_suspend_fix:     false
+drivers_nVidia_powerd_service:  true
+
+drivers_nVidia_base:
+  - nvidia-driver
+  - nvidia-driver-libs.i686
+
+drivers_kernel_args_nVidia:
+  - rd.driver.blacklist=nouveau
+  - modprobe.blacklist=nouveau
+  - nvidia-drm.modeset=1
+
+drivers_nVidia_extra: []
+

@@ -1,0 +1,76 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the packages-install sub-role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/packages-install
+
+# -----------------------------------------------------------------------------
+
+- name: Prepare complete list of packages to be installed
+  set_fact:
+    packages_list: "{{ packages_list | default('') }} {{ item }}"
+  with_items:
+    - "{{ packages_default | difference(packages_default_mask) }}"
+    - "{{ packages_extra_laptop }}"
+    - "{{ packages_extra_user }}"
+    - "{{ packages_extra_work }}"
+    - "{{ packages_extra_theme }}"
+    - "{{ packages_extra_codecs }}"
+    - "{{ packages_extra_plugins }}"
+    - "{{ packages_extra_utilities }}"
+
+# -----------------------------------------------------------------------------
+
+- name: Cancel any running rpm-ostree transactions
+  command:      rpm-ostree cancel
+
+- name: Run complete cleanup for rpm-ostree
+  command:      rpm-ostree cleanup --base --pending --repomd
+  when:         drivers_ostree_cleanup is not defined
+  async:        300
+  poll:         5
+
+- name: Force refresh the repositories metadata for rpm-ostree
+  command:      rpm-ostree refresh-md --force
+  when:         drivers_ostree_refresh is not defined
+  async:        600
+  poll:         5
+
+# NOTE: To prevent installation failures we need to upgrade all the ostree layers.
+- name: Upgrade system via rpm-ostree (might take a long time)
+  command:      rpm-ostree upgrade
+  when:         drivers_upgrade_reg is not defined
+  register:     upgrade_reg
+  changed_when: upgrade_reg.stdout|regex_search('No upgrade available.') == ""
+  async:        900
+  poll:         5
+
+- name: Uninstall all packages requested by the user (might take a long time)
+  command:      rpm-ostree uninstall --reboot --allow-inactive --idempotent {{ packages_to_remove | join(' ') }}
+  when:         packages_to_remove | length > 0
+  register:     uninstall_reg
+  changed_when: uninstall_reg.stdout|regex_search('No change.') == ""
+  async:        900
+  poll:         5
+
+- name: Install all packages requested by the user (might take a long time)
+  command:      rpm-ostree install --reboot --allow-inactive --idempotent {{ packages_list }}
+  register:     install_reg
+  changed_when: install_reg.stdout|regex_search('No change.') == ""
+  async:        1800
+  poll:         5
+
+- name: Remove packages from OSTree base layer (and reboot system if needed)
+  command:      rpm-ostree override remove --reboot {{ base_packages_to_remove | join(' ') }}
+  when:         base_packages_to_remove | length > 0
+  register:     base_layer_remove_reg
+  failed_when:  base_layer_remove_reg.stdout|regex_search('Override already exists') == ""
+  changed_when: base_layer_remove_reg.stdout|regex_search('Override already exists') == ""
+  async:        600
+  poll:         5
+
+# -----------------------------------------------------------------------------
+
+- name: Mark the packages-install sub-role as DONE
+  shell: echo 'DONE' > /etc/.setup/packages-install

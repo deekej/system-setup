@@ -1,0 +1,22 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# User configuration:
+
+display_name: Initial Setup
+username:     setup
+user_id:      1001
+group_id:     1001
+
+subuid_start: 100000
+subuid_range: 65535
+
+subgid_start: 100000
+subgid_range: 65535
+
+groups_membership:
+  - "{{ username }}"
+  - wheel
+
+login_shell:    /bin/bash
+password_plain: initial.setup

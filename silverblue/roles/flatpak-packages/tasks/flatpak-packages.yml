@@ -1,0 +1,155 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the flatpak-packages role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/flatpak-packages
+
+# -----------------------------------------------------------------------------
+
+- name: Remove unwanted packages by the user
+  flatpak:
+    name:   "{{ item }}"
+    state:  absent
+  loop:     "{{ flatpak_packages_to_remove }}"
+
+- name: Remove unused system-wide Flatpak packages
+  command:      flatpak uninstall --unused --assumeyes --system
+  register:     flatpak_remove_system
+  changed_when: flatpak_remove_system.stdout|regex_search('Nothing unused to uninstall') == ""
+
+- name: Remove unused user-installed Flatpak packages
+  command:      flatpak uninstall --unused --assumeyes --user
+  register:     flatpak_remove_user
+  changed_when: flatpak_remove_user.stdout|regex_search('Nothing unused to uninstall') == ""
+
+# -----------------------------------------------------------------------------
+
+# See: https://fedoraproject.org/wiki/Changes/Filtered_Flathub_Applications
+- name: Remove Flatpak remote - flathub - to disable Fedora's native filtering
+  flatpak_remote:
+    name:             flathub
+    state:            "{{ (flatpak_remote_enable_flathub|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  https://flathub.org/repo/flathub.flatpakrepo
+
+- name: Enable Flatpak remote - fedora
+  flatpak_remote:
+    name:             fedora
+    state:            "{{ (flatpak_remote_enable_fedora|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  oci+https://registry.fedoraproject.org
+
+# Readding the Flathub remote removes the filtering:
+- name: Enable Flatpak remote - flathub
+  flatpak_remote:
+    name:             flathub
+    state:            "{{ (flatpak_remote_enable_flathub|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  https://flathub.org/repo/flathub.flatpakrepo
+
+- name: Enable Flatpak remote - kdeapps
+  flatpak_remote:
+    name:             kdeapps
+    state:            "{{ (flatpak_remote_enable_kdeapps|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  https://distribute.kde.org/kdeapps.flatpakrepo
+
+- name: Enable Flatpak remote - flathub-beta
+  flatpak_remote:
+    name:             flathub-beta
+    state:            "{{ (flatpak_remote_enable_flathub_beta|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  https://flathub.org/beta-repo/flathub-beta.flatpakrepo
+
+- name: Enable Flatpak remote - gnome-nightly
+  flatpak_remote:
+    name:             gnome-nightly
+    state:            "{{ (flatpak_remote_enable_gnome_nightly|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  https://nightly.gnome.org/gnome-nightly.flatpakrepo
+
+- name: Enable Flatpak remote - eclipse-nightly
+  flatpak_remote:
+    name:             eclipse-nightly
+    state:            "{{ (flatpak_remote_enable_eclipse_nightly|bool) | ternary('present','absent') }}"
+    flatpakrepo_url:  http://eclipse.matbooth.co.uk/flatpak/nightly/eclipse.flatpakrepo
+
+# -----------------------------------------------------------------------------
+
+- name: Install additional packages requested by user (system-wide)
+  flatpak:
+    name:   "{{ item }}"
+    state:  present
+  with_items:
+    - "{{ flatpak_packages_default | difference(flatpak_packages_default_mask) }}"
+    - "{{ flatpak_packages_extra_drivers }}"
+    - "{{ flatpak_packages_extra_user }}"
+    - "{{ flatpak_packages_extra_work }}"
+    - "{{ flatpak_packages_extra_theme }}"
+    - "{{ flatpak_packages_extra_codecs }}"
+    - "{{ flatpak_packages_extra_plugins }}"
+    - "{{ flatpak_packages_extra_runtimes }}"
+    - "{{ flatpak_packages_extra_utilities }}"
+
+# -----------------------------------------------------------------------------
+
+- name: Prepare list of all Flatpak packages installed by the user
+  set_fact:
+    flatpak_packages_list: "{{ flatpak_packages_list | default([]) }} + {{ [item] }}"
+  with_items:
+    - "{{ flatpak_packages_default | difference(flatpak_packages_default_mask) }}"
+    - "{{ flatpak_packages_extra_drivers }}"
+    - "{{ flatpak_packages_extra_user }}"
+    - "{{ flatpak_packages_extra_work }}"
+    - "{{ flatpak_packages_extra_theme }}"
+    - "{{ flatpak_packages_extra_codecs }}"
+    - "{{ flatpak_packages_extra_plugins }}"
+    - "{{ flatpak_packages_extra_runtimes }}"
+    - "{{ flatpak_packages_extra_utilities }}"
+
+# NOTE: The DRI_PRIME=1 makes sure we use dedicated GPU primarily - if any is available.
+- name: Set DRI_PRIME=1 environment variable for all Flatpak packages
+  shell:        flatpak override --show && flatpak override --env=DRI_PRIME=1
+  register:     flatpak_override
+  changed_when: flatpak_override.stdout | regex_search('DRI_PRIME=1') == none
+
+- name: Fix displaying of custom themes in Flatpak apps - symlink
+  file:
+    src:    /usr/share/themes
+    path:   /var/home/{{ username }}/.local/share/themes
+    state:  link
+    force:  yes
+  become:   "{{ username }}"
+
+- name: Fix displaying of custom themes in Flatpak apps - override
+  shell:        flatpak override --show && flatpak override --filesystem=xdg-data/themes
+  register:     flatpak_override
+  changed_when: flatpak_override.stdout | regex_search('filesystems=xdg-data/themes') == none
+
+- name: Fix displaying of tray icon for Telegram Desktop
+  shell:        flatpak override --show org.telegram.desktop && flatpak override --env=QT_QPA_PLATFORM=xcb org.telegram.desktop
+  register:     flatpak_override
+  changed_when: flatpak_override.stdout | regex_search('QT_QPA_PLATFORM=xcb') == none
+  when:       '"org.telegram.desktop" in flatpak_packages_list'
+
+- name: Fix displaying of tray icon for Audacious Music Player
+  shell:        flatpak override --show org.atheme.audacious && flatpak override --env=QT_QPA_PLATFORM=xcb org.atheme.audacious
+  register:     flatpak_override
+  changed_when: flatpak_override.stdout | regex_search('QT_QPA_PLATFORM=xcb') == none
+  when:       '"org.atheme.audacious" in flatpak_packages_list'
+
+- name: Fix playback issues for Firefox Browser in Wayland
+  shell:        flatpak override --show org.mozilla.firefox && flatpak override --socket=wayland --env=MOZ_ENABLE_WAYLAND=1 org.mozilla.firefox
+  register:     flatpak_override
+  changed_when:
+    - flatpak_override.stdout | regex_search('sockets=wayland') == none
+    - flatpak_override.stdout | regex_search('MOZ_ENABLE_WAYLAND=1') == none
+  when:       '"org.mozilla.firefox" in flatpak_packages_list'
+
+- name: Fix playback issues for VLC Player in Wayland
+  shell:        flatpak override --show org.videolan.VLC && flatpak override --socket=wayland --env=QT_QPA_PLATFORM=xcb org.videolan.VLC
+  register:     flatpak_override
+  changed_when:
+    - flatpak_override.stdout | regex_search('sockets=wayland') == none
+    - flatpak_override.stdout | regex_search('QT_QPA_PLATFORM=xcb') == none
+  when:       '"org.videolan.VLC" in flatpak_packages_list'
+
+# -----------------------------------------------------------------------------
+
+- name: Mark the flatpak-packages sub-role as DONE
+  shell: echo 'DONE' > /etc/.setup/flatpak-packages

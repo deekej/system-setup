@@ -1,0 +1,108 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: "Mark the drivers-install sub-role as IN PROGRESS"
+  shell: echo 'IN PROGRESS' > /etc/.setup/drivers-install
+
+# -----------------------------------------------------------------------------
+
+- name: Prepare list of nVidia drivers packages to install
+  set_fact:
+    drivers_list: "{{ (drivers_nVidia_base + drivers_nVidia_extra) | join(' ')}}"
+
+- name: Prepare kernel arguments for nVidia drivers
+  set_fact:
+    kargs_list: "{{ (kargs_list | default('')) }} --append-if-missing={{ item }}"
+  loop: "{{ drivers_kernel_args_nVidia }}"
+
+# -----------------------------------------------------------------------------
+
+- name: Append kernel argument for 'suspend resume fix' for nVidia drivers
+  set_fact:
+    kargs_list: "{{ kargs_list }} --append-if-missing=nvidia.NVreg_PreserveVideoMemoryAllocations=1"
+  when: drivers_nVidia_suspend_fix | bool
+
+- name: Check if the 'deep' sleep is selected as default for 'mem_sleep_default' kernel parameter
+  shell: cat /sys/power/mem_sleep | grep -E -o -e '\[.*\]'
+  register: sleep_status
+  changed_when: sleep_status.stdout != '[deep]'
+  when: drivers_nVidia_suspend_fix | bool
+
+- name: Append kernel argument for 'suspend resume fix' for nVidia drivers (mem_sleep_default)
+  set_fact:
+    kargs_list: "{{ kargs_list }} --append-if-missing=mem_sleep_default=deep"
+  when: (drivers_nVidia_suspend_fix | bool) and (sleep_status.stdout != '[deep]')
+
+# -----------------------------------------------------------------------------
+
+- name: Cancel any running rpm-ostree transactions
+  command:      rpm-ostree cancel
+
+- name: Run complete cleanup for rpm-ostree
+  command:      rpm-ostree cleanup --base --pending --repomd
+  register:     drivers_ostree_cleanup
+  async:        300
+  poll:         5
+
+- name: Force refresh the repositories metadata for rpm-ostree
+  command:      rpm-ostree refresh-md --force
+  register:     drivers_ostree_refresh
+  async:        600
+  poll:         5
+
+# NOTE: To prevent installation failures we need to upgrade all the ostree layers.
+- name: Upgrade system via rpm-ostree (might take a long time)
+  command:      rpm-ostree upgrade
+  register:     drivers_upgrade_reg
+  changed_when: drivers_upgrade_reg.stdout|regex_search('No upgrade available.') == ""
+  async:        900
+  poll:         5
+
+- name: Install nVidia drivers packages via rpm-ostree (might take a long time)
+  command:      rpm-ostree install --allow-inactive --idempotent {{ drivers_list }}
+  register:     drivers_install_reg
+  changed_when: drivers_install_reg.stdout|regex_search('No change.') == ""
+  async:        1800
+  poll:         5
+
+- name: Update the kernel arguments via rpm-ostree (might take a long time)
+  command:      rpm-ostree kargs --reboot {{ kargs_list }}
+  register:     drivers_kargs_reg
+  changed_when: drivers_kargs_reg.stdout|regex_search('No changes.') == ""
+  async:        300
+  poll:         5
+
+# -----------------------------------------------------------------------------
+
+- name: Enable 'suspend resume fix' in nVidia kernel module
+  blockinfile:
+    path:   /etc/modprobe.d/nvidia-modeset.conf
+    owner:  root
+    group:  root
+    mode:   0644
+    block: |
+      # Enable VRAM allocation preservation for system suspension:
+      options nvidia NVreg_PreserveVideoMemoryAllocations=1
+  when: drivers_nVidia_suspend_fix | bool
+
+- name: Enable necessary nVidia systemd services
+  systemd:
+    name:     "{{ item }}.service"
+    enabled:  yes
+  with_items:
+    - nvidia-hibernate
+    - nvidia-suspend
+    - nvidia-resume
+
+- name: Disable nVidia powerd service
+  systemd:
+    name:     nvidia-powerd.service
+    enabled:  no
+  when: drivers_nVidia_powerd_service | bool
+
+# -----------------------------------------------------------------------------
+
+- name: "Mark the drivers-install sub-role as DONE"
+  shell: echo 'DONE' > /etc/.setup/drivers-install
+

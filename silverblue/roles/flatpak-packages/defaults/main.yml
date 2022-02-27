@@ -1,0 +1,42 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+flatpak_remote_enable_fedora:           true
+flatpak_remote_enable_flathub:          true
+flatpak_remote_enable_kdeapps:          false
+
+flatpak_remote_enable_flathub_beta:     false
+
+flatpak_remote_enable_gnome_nightly:    false
+flatpak_remote_enable_eclipse_nightly:  false
+
+# -----------------------------------------------------------------------------
+
+flatpak_packages_to_remove: []
+
+flatpak_packages_default:
+  - org.gnome.baobab                        # Disk Usage Analyzer
+  - org.gnome.DejaDup                       # Backup Software
+  - org.atheme.audacious                    # Music Player
+  - org.videolan.VLC                        # Video Player
+  - org.fedoraproject.MediaWriter           # Live USB Creator
+
+# In case someone doesn't want some of the default packages installed:
+flatpak_packages_default_mask: []
+
+# Additional packages that can be specified by the user:
+flatpak_packages_extra_drivers: []
+flatpak_packages_extra_user: []
+flatpak_packages_extra_work: []
+
+flatpak_packages_extra_theme:
+  - org.kde.KStyle.Adwaita                  # Support for default QT theming (Adwaita)
+  - org.kde.PlatformTheme.QGnomePlatform    # Support for default QT theming (Adwaita)
+
+flatpak_packages_extra_codecs: []
+flatpak_packages_extra_plugins: []
+flatpak_packages_extra_runtimes: []
+flatpak_packages_extra_utilities: []
+
+

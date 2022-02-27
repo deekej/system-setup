@@ -1,0 +1,13 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+# Run only if /etc/.setup/system-config is not yet DONE...
+- name: Check if the system configuration is DONE
+  shell: cat /etc/.setup/system-config 2> /dev/null || echo 'IN PROGRESS'
+  register: system_config_status
+  changed_when: system_config_status.stdout != 'DONE'
+
+- name: Run the system-config role
+  include_tasks: system-config.yml
+  when: system_config_status.stdout != 'DONE'

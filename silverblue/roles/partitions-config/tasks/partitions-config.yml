@@ -1,0 +1,258 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the user-config role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/partitions-config
+
+# -----------------------------------------------------------------------------
+#
+# TODO: Add some basic sanity checking for initial partitions configuration
+#
+
+- name: Parse the LUKS partition's UUID from the mount output
+  shell:
+    cmd: mount | grep -E -m 1 -o -e "^/dev/mapper/luks-[[:alnum:]-]+"
+    warn: false
+  register: luks_part_reg
+
+- name: Parse the /boot partition's UUID from mount output
+  shell:
+    cmd: grep -E -m 1 -e '/boot[[:space:]]+' /etc/fstab | grep -E -o -e '^UUID=[[:alnum:]-]+'
+  register: boot_part_reg
+
+- name: Parse the /boot/efi partition's UUID from mount output
+  shell:
+    cmd: grep -E -m 1 -e '/boot/efi' /etc/fstab | grep -E -o -e '^UUID=[[:alnum:]-]+'
+  register: efi_part_reg
+
+- name: Parse the BTRFS partition's UUID from mount output
+  shell:
+    cmd: grep -E -m 1 -e '[[:space:]]+/[[:space:]]+' /etc/fstab | grep -E -o -e '^UUID=[[:alnum:]-]+'
+  register: btrfs_part_reg
+
+# -----------------------------------------------------------------------------
+
+- name: Check the LUKS partition's UUID has been parsed correctly
+  fail:
+    msg: "Failed to parse LUKS partition's UUID. Parsing result: {{ luks_part_reg.stdout }}"
+  when: luks_part_reg.stdout | length < 53   # /dev/mapper/luks + the UUID
+
+- name: Check the /boot partition's UUID has been parsed correctly
+  fail:
+    msg: "Failed to parse /boot partition's UUID. Parsing result: {{ boot_part_reg.stdout }}"
+  when: boot_part_reg.stdout | length < 41   # UUID= + UUID_value
+
+- name: Check the /boot/efi partition's UUID has been parsed correctly
+  fail:
+    msg: "Failed to parse /boot/efi partition's UUID. Parsing result: {{ efi_part_reg.stdout }}"
+  when: efi_part_reg.stdout | length < 14    # UUID= + UUID_value
+
+- name: Check the BTRFS partition's UUID has been parsed correctly
+  fail:
+    msg: "Failed to parse BTRFS partition's UUID. Parsing result: {{ btrfs_part_reg.stdout }}"
+  when: btrfs_part_reg.stdout | length < 41  # UUID=+ UUID_value
+
+# -----------------------------------------------------------------------------
+
+- name: Assign the parsed outputs into Ansible variables
+  set_fact:
+    luks_part_UUID:   "{{ luks_part_reg.stdout }}"
+    boot_part_UUID:   "{{ boot_part_reg.stdout }}"
+    efi_part_UUID:    "{{ efi_part_reg.stdout }}"
+    btrfs_part_UUID:  "{{ btrfs_part_reg.stdout }}"
+
+# -----------------------------------------------------------------------------
+
+- name: "Create the mount point directory {{ btrfs_mount_point }}"
+  file:
+    path:   "{{ btrfs_mount_point }}"
+    state:  directory
+    owner:  root
+    group:  root
+    mode:   0700
+
+- name: Create additional mount points for NTFS drives
+  file:
+    path:   "{{ item.mount_point }}"
+    state:  directory
+    owner:  root
+    group:  root
+    mode:   0755
+  loop:     "{{ NTFS_mount_points }}"
+  when:     NTFS_mounts | bool
+
+- name: "Mount the {{ btrfs_mount_point }}"
+  ansible.posix.mount:
+    src:    "{{ luks_part_UUID }}"
+    path:   "{{ btrfs_mount_point }}"
+    state:  mounted
+    fstype: btrfs
+
+- name: Create additional BTRFS subvolumes
+  command: btrfs subvolume create "{{ item }}"
+  args:
+    chdir:    "{{ btrfs_mount_point }}"
+    creates:  "{{ item }}"
+  loop:       "{{ btrfs_subvolumes }}"
+
+- name: Set the correct ownership/permissions for the created subvolumes
+  file:
+    path:   "{{ btrfs_mount_point }}/{{ item }}"
+    state:  directory
+    owner:  "{{ username }}"
+    group:  "{{ username }}"
+    mode:   0755
+  loop:     "{{ btrfs_subvolumes | difference(btrfs_subvolumes_owner_only) }}"
+
+- name: Set the '0700' permissions for specified subvolumes
+  file:
+    path:   "{{ btrfs_mount_point }}/{{ item }}"
+    state:  directory
+    owner:  "{{ username }}"
+    group:  "{{ username }}"
+    mode:   0700
+  loop:     "{{ btrfs_subvolumes_owner_only }}"
+
+- name: Set the (no) copy-on-write attribute for specified volumes
+  file:
+    path:         "{{ btrfs_mount_point }}/{{ item }}"
+    state:        directory
+    recurse:      yes
+    attributes:   '+C'
+  ignore_errors:  yes
+  loop:           "{{ btrfs_subvolumes_nodatacow }}"
+
+- name: Check the existence of 'root' subvolume
+  stat:
+    path:   "{{ btrfs_mount_point }}/root"
+  register: root_subvol
+
+- name: Rename the 'root' subvolume to '@'
+  command: mv root @
+  args:
+    chdir:    "{{ btrfs_mount_point }}"
+    creates:  '@'
+    removes:  'root'
+
+# -----------------------------------------------------------------------------
+
+- name: Create necessary folders in the {{ username }} BTRFS subvolume
+  file:
+    state:  directory
+    path:   "{{ btrfs_mount_point }}/{{ username }}/{{ item.path }}"
+    mode:   "{{ item.mode }}"
+    owner:  "{{ username }}"
+    group:  "{{ username }}"
+  with_items:
+    - path: .backups
+      mode: '0700'
+
+    - path: .cache
+      mode: '0700'
+
+    - path: .config
+      mode: '0755'
+
+    - path: .local
+      mode: '0755'
+
+    - path: .local/share
+      mode: '0755'
+
+    - path: build
+      mode: '0755'
+
+    - path: devel
+      mode: '0755'
+
+    - path: Documents
+      mode: '0755'
+
+    - path: Downloads
+      mode: '0755'
+
+    - path: Dropbox
+      mode: '0755'
+
+    - path: Music
+      mode: '0755'
+
+    - path: Pictures
+      mode: '0755'
+
+    - path: Videos
+      mode: '0755'
+
+# -----------------------------------------------------------------------------
+
+# TODO: Update the template and variable substitutions to be more general.
+
+- name: Copy substitued fstab template to /etc
+  template:
+    src:    templates/fstab.j2
+    dest:   /etc/fstab
+    owner:  root
+    group:  root
+    mode:   0644
+
+# -----------------------------------------------------------------------------
+
+- name: Add additional NTFS mounts to the /etc/fstab
+  shell: echo "{{ '%-41s' | format(item.device) }} {{ '%-31s' | format(item.mount_point) }} ntfs    defaults,nofail,x-systemd.device-timeout=0,nls-utf8,noatime,umask-0222,uid-{{ user_id }},gid-{{ group_id }},rw       0 0" >> /etc/fstab
+  loop: "{{ NTFS_mount_points }}"
+  when: NTFS_mounts
+
+- name: Restore SELinux context for the /etc/fstab file
+  command: restorecon -F /etc/fstab
+
+- name: Update systemd units generated from /etc/fstab
+  systemd:
+    daemon-reload: yes
+
+# -----------------------------------------------------------------------------
+
+- name: Enable native resolution in GRUB menu
+  replace:
+    path:     /etc/default/grub
+    regexp:   '(^GRUB_TERMINAL_OUTPUT=.*)'
+    replace:  '#\1'
+
+- name: Enable saving last boot entry for GRUB
+  lineinfile:
+    path:         /etc/default/grub
+    line:         GRUB_SAVEDEFAULT=true
+    state:        present
+    insertafter:  EOF
+
+- name: Update the GRUB
+  command: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+- name: Update the kernel arguments for new root subvolume
+  command: rpm-ostree kargs --delete='rootflags=subvol=root' --append='rootflags=subvol=@'
+  when: (root_subvol.stat.isdir is defined) and (root_subvol.stat.isdir)
+
+# -----------------------------------------------------------------------------
+
+- name: Unmount the {{ btrfs_mount_point }}
+  ansible.posix.mount:
+    src:    "{{ luks_part_UUID }}"
+    path:   "{{ btrfs_mount_point }}"
+    state:  unmounted
+    fstype: btrfs
+
+# -----------------------------------------------------------------------------
+
+- name: "Mark the partitions-config role as DONE"
+  shell: echo 'DONE' > /etc/.setup/partitions-config
+
+- name: Check if the reboot is needed
+  shell:    mount | grep -m 1 "/var/home/{{ username }}"
+  args:
+    warn:   false
+  register: reboot_needed
+
+- name: Rebooting the machine to apply changes (in 10 seconds)
+  shell:  sleep 10 && systemctl reboot
+  when:   'username|string not in reboot_needed.stdout'
+

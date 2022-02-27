@@ -1,0 +1,30 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# defaults file for roles/partitions-configuration
+
+tmpfs_size:         4G
+btrfs_mount_point:  /mnt/btrfs
+
+btrfs_subvolumes:
+  - "{{ username }}"
+  - "{{ username }}.cache"
+  - "{{ username }}.documents"
+  - "{{ username }}.downloads"
+  - "{{ username }}.music"
+  - "{{ username }}.pictures"
+  - "{{ username }}.videos"
+
+btrfs_subvolumes_owner_only:
+  - "{{ username }}"
+  - "{{ username }}.cache"
+
+btrfs_subvolumes_nodatacow:
+  - "{{ username }}.cache"
+  - "{{ username }}.downloads"
+
+NTFS_mounts: False
+
+NTFS_mount_points:
+  - device:       None
+    mount_point:  None

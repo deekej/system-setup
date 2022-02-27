@@ -1,0 +1,13 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+# Run only if /etc/.setup/system-tweaks is not yet DONE...
+- name: Check if the system tweaks are DONE
+  shell: cat /etc/.setup/system-tweaks 2> /dev/null || echo 'IN PROGRESS'
+  register: system_tweaks_status
+  changed_when: system_tweaks_status.stdout != 'DONE'
+
+- name: Run the system-tweaks role
+  include_tasks: system-tweaks.yml
+  when: system_tweaks_status.stdout != 'DONE'

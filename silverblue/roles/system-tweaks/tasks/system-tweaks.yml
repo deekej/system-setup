@@ -1,0 +1,320 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the system-tweaks role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/system-tweaks
+
+# -----------------------------------------------------------------------------
+
+- name: Create a temporary directory /tmp/repos (in RAM)
+  file:
+    path:   /tmp/repos
+    state:  "{{ item }}"
+    owner:  root
+    group:  root
+  with_items:
+    - absent
+    - directory
+
+# -----------------------------------------------------------------------------
+
+- name: Clone the usr.local tweaks repository from deekej into /tmp
+  git:
+    repo:             git@github.com:deekej/usr.local.git
+    dest:             /tmp/repos/usr.local
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/root.home
+  git:
+    repo:             git@github.com:deekej/root.home.git
+    dest:             /tmp/repos/root.home
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/profile.d
+  git:
+    repo:             git@github.com:deekej/profile.d.git
+    dest:             /tmp/repos/profile.d
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/ssh.config
+  git:
+    repo:             git@github.com:deekej/ssh.config.git
+    dest:             /tmp/repos/ssh.config
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/git.config
+  git:
+    repo:             git@github.com:deekej/git.config.git
+    dest:             /tmp/repos/git.config
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/bash.config
+  git:
+    repo:             git@github.com:deekej/bash.config.git
+    dest:             /tmp/repos/bash.config
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/zsh.config
+  git:
+    repo:             git@github.com:deekej/zsh.config.git
+    dest:             /tmp/repos/zsh.config
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+
+- name: Clone additional repository into /tmp - github.com:deekej/vim-ultimate-IDE
+  git:
+    repo:             git@github.com:deekej/vim-ultimate-IDE.git
+    dest:             /tmp/repos/vim.config
+    key_file:         /root/.ssh/id_rsa
+    force:            yes
+    recursive:        yes
+    accept_hostkey:   yes
+    track_submodules: yes
+ 
+# ---| usr.local |-------------------------------------------------------------
+
+- name: Copy the content of usr.local repository into /usr/local
+  shell:    cp -v -r --preserve=all /tmp/repos/usr.local/. /usr/local/.
+
+- name: Set restrictive permissions for the /usr/local git repository files
+  file:
+    path:   "{{ item.path }}"
+    mode:   "{{ item.mode }}"
+    owner:  root
+    group:  root
+  with_items:
+    - path: /usr/local/LICENSE
+      mode: '0600'
+
+    - path: /usr/local/.gitignore
+      mode: '0600'
+
+    - path: /usr/local/.git
+      mode: '0700'
+
+- name: Update the mimeinfo.cache for /usr/local/share/applications
+  command: update-mime-database /usr/local/share/applications
+
+- name: Update the mimdesktop database with new launchers
+  command: update-desktop-database
+
+- name: Update the font configuration cache (system-wide)
+  command: fc-cache -f -v
+
+- name: Make sure the applications' tweaks are used
+  file:
+    src:    /usr/local/share/applications
+    path:   /var/home/{{ username }}/.local/share/applications
+    state:  link
+    force:  yes
+  become:   "{{ username }}"
+
+# ---| root.home |-------------------------------------------------------------
+
+- name: Copy the content of root.home repository into /root
+  shell:    cp -v -r --preserve=all /tmp/repos/root.home/. /root/.
+
+- name: Set correct permissions for contents of /root/.ssh/ folder
+  file:
+    path:   "{{ item.path }}"
+    mode:   "{{ item.mode }}"
+    owner:  root
+    group:  root
+  with_items:
+    - path: /root/.ssh
+      mode: '0700'
+
+    - path: /root/.ssh/authorized_keys
+      mode: '0600'
+
+    - path: /root/.ssh/config
+      mode: '0600'
+
+    - path: /root/.ssh/id_rsa
+      mode: '0600'
+
+    - path: /root/.ssh/id_rsa.pub
+      mode: '0644'
+
+    - path: /root/.ssh/known_hosts
+      mode: '0600'
+
+    - path: /root/.ssh/ssh_config
+      mode: '0600'
+
+- name: Download additional VIM plugins for root
+  shell:    echo -e '\n' | vim +PluginInstall +qall
+
+# ---| profile.d |-------------------------------------------------------------
+
+- name: Copy the content of profile.d repository into /etc/profile.d
+  shell:    cp -v -r --preserve=all /tmp/repos/profile.d/. /etc/profile.d/.
+
+# ---| Ansible |---------------------------------------------------------------
+
+- name: Enable vault-pass-prompt script as vault_password_file for Ansible
+  lineinfile:
+    path:   /etc/ansible/ansible.cfg
+    owner:  root
+    group:  root
+    mode:   0644
+    regexp: '^#vault_password_file =.*$'
+    line:   'vault_password_file = /usr/local/bin/vault-pass-prompt'
+
+# ---| AppImage Apps |---------------------------------------------------------
+
+- name: Make sure AppImage Apps are not running
+  shell: 'killall -q {{ item }} || :'
+  with_items:
+    - pcloud
+    - timeular
+
+- name: Download AppImage applications into /usr/locan/bin
+  get_url:
+    url:    "{{ item.link }}"
+    dest:   "/usr/local/bin/{{ item.name }}"
+    mode:   0755
+    owner:  root
+    group:  root
+  with_items:
+    - link: https://github.com/deekej/apps/raw/master/pcloud
+      name: pcloud
+
+    - link: https://github.com/deekej/apps/raw/master/timeular
+      name: timeular
+
+# ===| User Configs / Tweaks |=================================================
+
+# ---| ssh.config |------------------------------------------------------------
+
+- name: Copy the content of ssh.config repository into /home/{{ username }}
+  shell: cp -v -r --preserve=all /tmp/repos/ssh.config /home/{{ username }}/.ssh
+
+- name: Initialize & set correct file permissions for /home/{{ username }}/.ssh/ folder
+  shell:    ./.post-checkout.hook
+  args:
+    chdir:  /home/{{ username }}/.ssh
+
+# ---| git.config |------------------------------------------------------------
+
+- name: Copy the content of git.config repository into /home/{{ username }}
+  shell: cp -v -r --preserve=all /tmp/repos/git.config /home/{{ username }}/.config/git
+
+- name: Create the /home/{{ username }}/.gitconfig symlink
+  shell:    ln -sf .config/git/config .gitconfig
+  args:
+    chdir:  /home/{{ username }}
+    warn:   false
+  become:   "{{ username }}"
+
+# ---| bash.config |-----------------------------------------------------------
+
+- name: Copy the content of bash.config repository into /home/{{ username }}
+  shell: cp -v -r --preserve=all /tmp/repos/bash.config /home/{{ username }}/.bash
+
+- name: Create the necessary symlinks for bash in /home/{{ username }}
+  shell:      ln -sf {{ item.target }} {{ item.link }}
+  args:
+    chdir:    /home/{{ username }}
+    warn:     false
+  become:     "{{ username }}"
+  with_items:
+    - target: .bash/bashrc
+      link:   .bashrc
+
+    - target: .bash/logout
+      link:   .bash_logout
+
+    - target: .bash/profile
+      link:   .bash_profile
+
+    - target: .bash/profile
+      link:   .profile
+
+# ---| zsh.config |------------------------------------------------------------
+
+- name: Copy the content of zsh.config repository into /home/{{ username }}
+  shell: cp -v -r --preserve=all /tmp/repos/zsh.config /home/{{ username }}/.zsh
+
+- name: Create the /home/{{ username }}/.zshrc symlink
+  shell:      ln -sf .zsh/zshrc .zshrc
+  args:
+    chdir:    /home/{{ username }}
+    warn:     false
+  become:     "{{ username }}"
+
+# ---| vim.config |------------------------------------------------------------
+
+- name: Copy the content of vim-ultimate-IDE repository into /home/{{ username }}
+  shell: cp -v -r --preserve=all /tmp/repos/vim.config /home/{{ username }}/.vim
+
+- name: Create the necessary symlinks for VIM in /home/{{ username }}
+  shell:    ln -sf {{ item.target }} {{ item.link }}
+  args:
+    chdir:    /home/{{ username }}
+    warn:     false
+  become:     "{{ username }}"
+  with_items:
+    - target: .vim/vimrc
+      link:   .vimrc
+
+    - target: .vim/gvimrc
+      link:   .gvimrc
+
+- name: Download additional VIM plugins for {{ username }}
+  shell:  echo -e '\n' | vim +PluginInstall +qall
+  become: "{{username}}"
+
+- name: Restore ownership of /home/{{ username }} folder for {{ username }}
+  shell:  chown -R {{ username }}:{{ username }} {{ item }}
+  args:
+    chdir:  "/home/{{ username }}"
+    warn:   false
+  with_items:
+    - .bash
+    - .config/git
+    - .ssh
+    - .vim
+    - .zsh
+
+- name: Restore ownership of /home/{{ username }}/.snapshots to root
+  file:
+    path:   /home/{{ username }}/.snapshots
+    state:  directory
+    owner:  root
+    group:  root
+    mode:   0700
+
+# -----------------------------------------------------------------------------
+
+- name: Mark the system-tweaks role as DONE
+  shell: echo 'DONE' > /etc/.setup/system-tweaks
+

@@ -1,0 +1,6 @@
+[submodule "silverblue/roles/customize-gnome"]
+	path = silverblue/roles/customize-gnome
+	url = git@github.com:PeterMosmans/ansible-role-customize-gnome.git
+[submodule "silverblue/collections/ansible.posix"]
+	path = silverblue/collections/ansible.posix
+	url = git@github.com:ansible-collections/ansible.posix.git

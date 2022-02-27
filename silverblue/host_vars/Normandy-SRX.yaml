@@ -1,0 +1,22 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+# Configuration (variables) for Normandy-SR3 [Desktop]
+
+hostname_FQDN:  Normandy-SRX.deekej.io
+
+# ---| Partitions Configuration |----------------------------------------------
+NTFS_mounts:  false
+
+# ---| DNF repos configuration |-----------------------------------------------
+nVidia_drivers: false
+
+# ---| Layered packages configuration |----------------------------------------
+install_drivers:  false
+
+# ---| Flatpak packages configuration |----------------------------------------
+
+# ---| System configuration |--------------------------------------------------
+laptop_config:        true
+redhat_work_config:   true
+#CUPS_on_LDAP_server:  true

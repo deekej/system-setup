@@ -1,0 +1,72 @@
+---
+# vim: filetype=yaml.ansible
+
+- hosts: localhost
+  become: yes
+  become_user: root
+  vars:
+    force: False
+
+  # TODO:
+  #   - Create a separate vars file with Gnome configuration to use with:
+  #     * https://github.com/PeterMosmans/ansible-role-customize-gnome
+  #     * https://galaxy.ansible.com/PeterMosmans/customize-gnome
+  #
+  #   - Create a separate playbook for configuration of toolboxes
+
+  # TODO: Investigate how to make this work more naturally (in Ansible-way).
+  pre_tasks:
+    - name: Check the hostname is not 'localhost'
+      fail:
+        msg: "hostname 'localhost' is not supported"
+      when: ansible_hostname == 'localhost'
+
+    - name: Check the config file exists for "{{ ansible_hostname }}"
+      stat:
+        path: "host_vars/{{ ansible_hostname }}.yaml"
+      register: config_path
+
+    - name: Fail if the config file does not exist
+      fail:
+        msg: "host_vars/{{ ansible_hostname }}.yaml config file does not exist. Is the correct hostname set?"
+      when: not config_path.stat.exists
+
+    - name: Source the correct config file for "{{ ansible_hostname }}"
+      include_vars: "host_vars/{{ ansible_hostname }}.yaml"
+
+    - name: Make sure the machine has FQDN hostname set
+      hostname:
+        name: "{{ hostname_FQDN }}"
+        use: systemd
+
+    - name: Force re-run of all the configuration operations
+      file:
+        path:   /etc/.setup
+        state:  "{{ item }}"
+        owner:  root
+        group:  root
+        mode:   '0700'
+      with_items:
+        - absent
+        - directory
+      when: force | bool
+
+  # ---------------------------------------------------------------------------
+
+  roles:
+    - user-config
+    - partitions-config
+    - dnf-config
+    - layered-packages
+    - flatpak-packages
+    - system-config
+    - system-tweaks
+    - user-environment
+
+  # ---------------------------------------------------------------------------
+
+#  post_tasks:
+#    - name: Cleanup of /etc/.setup
+#      file:
+#        path:   /etc/.setup
+#        state:  absent

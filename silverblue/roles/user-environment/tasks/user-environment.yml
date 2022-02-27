@@ -1,0 +1,36 @@
+---
+# vim: filetype=yaml.ansible
+# --------------------------
+
+- name: Mark the user-environment role as IN PROGRESS
+  shell: echo 'IN PROGRESS' > /etc/.setup/user-environment
+
+# -----------------------------------------------------------------------------
+
+# This role (for now) installs only the gnome-shell extensions for the user:
+- name: Run the customize-gnome sub-role
+  include_role:
+    name: customize-gnome
+
+# -----------------------------------------------------------------------------
+
+- name: Create /home/{{ username }}/.config/dconf folder
+  file:
+    path:   /home/{{ username }}/.config/dconf
+    state:  directory
+    owner:  "{{ username }}"
+    group:  "{{ username }}"
+    mode:   0700
+
+- name: Copy dconf settings for {{ username }} user
+  copy:
+    src:    files/dconf.user
+    dest:   /home/{{ username }}/.config/dconf/user
+    owner:  "{{ username }}"
+    group:  "{{ username }}"
+    mode:   0644
+
+# -----------------------------------------------------------------------------
+
+- name: Mark the user-environment role as DONE
+  shell: echo 'DONE' > /etc/.setup/user-environment
