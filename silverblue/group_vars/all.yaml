@@ -87,6 +87,7 @@ packages_extra_work:
   - pass-otp
   - screen
   - virt-manager
+  - virt-viewer           # temporary until Gnome Connections supports SPICE
   - wl-clipboard          # dependency for pass
 
 packages_extra_theme:
