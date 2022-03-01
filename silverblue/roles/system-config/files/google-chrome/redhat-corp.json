@@ -1,4 +1,4 @@
 {
-  "AuthServerWhitelist": "*.redhat.com",
-  "AuthNegotiateDelegateWhitelist": "*.redhat.com"
+  "AuthServerWhitelist": "*.fedoraproject.org,*.redhat.com,*.ipa.redhat.com",
+  "AuthNegotiateDelegateWhitelist": "*fedoraproject.org,*.redhat.com,*.ipa.redhat.com"
 }

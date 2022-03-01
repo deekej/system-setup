@@ -320,7 +320,7 @@
     mode:       0644
   with_items:
     - src:    files/certs/ipa.crt
-      dest:   /etc/ipa/ipa.crt
+      dest:   /etc/ipa/ca.crt
 
     - src:    files/certs/redhat-legacy.crt
       dest:   /etc/pki/ca-trust/source/anchors/redhat-legacy.crt
@@ -410,6 +410,15 @@
     group:    root
     mode:     0644
   when:       redhat_work_config
+
+- name: Create additional symlink of Kerberos configuration for Chromium in /etc
+  file:
+    src:      /etc/opt/chrome/policies/managed/redhat-corp.json
+    dest:     /etc/chromium/policies/managed/redhat-corp.json
+    owner:    root
+    group:    root
+    state:    link
+    force:    yes
 
 - name: Copy Red Hat's LDAP configuration file into /etc
   copy:
