@@ -105,6 +105,7 @@ packages_extra_plugins:
 
 packages_extra_utilities:
   - ascii
+  - asciinema
   - autojump-zsh
   - ctags
   - fzf
