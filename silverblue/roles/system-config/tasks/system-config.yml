@@ -380,6 +380,12 @@
     - src:    files/etc/krb5.conf
       dest:   /etc/krb5.conf
 
+    - src:    files/krb5.conf.d/enable_sssd_conf_dir
+      dest:   /etc/krb5.conf.d/enable_sssd_conf_dir
+
+    - src:    files/krb5.conf.d/fedoraproject_org
+      dest:   /etc/krb5.conf.d/fedoraproject_org
+
     - src:    files/krb5.conf.d/redhat_com
       dest:   /etc/krb5.conf.d/redhat_com
   when:       redhat_work_config
@@ -434,7 +440,6 @@
 - name: Load the new VPN profiles with NetworkManager
   command:    nmcli connection reload
   when:       redhat_work_config
-
 
 # -----------------------------------------------------------------------------
 
