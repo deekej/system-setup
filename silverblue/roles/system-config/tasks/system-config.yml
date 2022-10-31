@@ -277,38 +277,11 @@
     mode:       0755
   when:         laptop_config
 
-- name: Copy Thinkfan configuration for custom laptop's fan curve
-  copy:
-    src:        files/etc/thinkfan.conf
-    dest:       /etc/thinkfan.conf
-    owner:      root
-    group:      root
-    mode:       0644
-  when:         laptop_config
-
-- name: Run automatic sensors-detect to enable Thinkfan functionality
-  command:      sensors-detect --auto
-  when:         laptop_config
-
 - name: Load the necessary kernel modules identified by the sensors-detect
   systemd:
     name:       systemd-modules-load
     state:      restarted
   when:         laptop_config
-
-- name: Enable & start the Thinkfan systemd service
-  systemd:
-    name:       thinkfan
-    state:      started
-    enabled:    yes
-  when:         laptop_config
-
-# NOTE: In case of issues with Thinkfan service it might be necessary to follow
-#       the troubleshooting section described here:
-#       https://gist.github.com/abn/de81ba413f860b00c2db3ee4aa83e035
-#
-#       In case of other issues with Thinkpad laptops follow:
-#       https://wiki.archlinux.org/title/Lenovo_ThinkPad_X1_Carbon_(Gen_5)
 
 # -----------------------------------------------------------------------------
 

@@ -35,8 +35,7 @@ packages_default:
 # In case someone doesn't want some of the default packages installed:
 packages_default_mask: []
 
-packages_extra_laptop:
-  - thinkfan
+packages_extra_laptop: []
 
 # Additional packages that can be specified by the user:
 packages_extra_user: []
