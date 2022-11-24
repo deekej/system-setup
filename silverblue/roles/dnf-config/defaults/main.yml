@@ -6,7 +6,6 @@ nVidia_drivers: false
 
 repos:
   - fedora-rar.repo
-  - github.repo
   - google-chrome.repo
   - rpmfusion-free.repo
   - rpmfusion-free-updates.repo

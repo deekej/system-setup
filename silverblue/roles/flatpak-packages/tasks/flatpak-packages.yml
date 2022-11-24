@@ -29,45 +29,52 @@
 - name: Remove Flatpak remote - flathub - to disable Fedora's native filtering
   flatpak_remote:
     name:             flathub
-    state:            "{{ (flatpak_remote_enable_flathub|bool) | ternary('present','absent') }}"
+    state:            absent
     flatpakrepo_url:  https://flathub.org/repo/flathub.flatpakrepo
+  when: flatpak_remote_enable_flathub|bool
 
 - name: Enable Flatpak remote - fedora
   flatpak_remote:
     name:             fedora
-    state:            "{{ (flatpak_remote_enable_fedora|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  oci+https://registry.fedoraproject.org
+  when: flatpak_remote_enable_fedora|bool
 
 # Readding the Flathub remote removes the filtering:
 - name: Enable Flatpak remote - flathub
   flatpak_remote:
     name:             flathub
-    state:            "{{ (flatpak_remote_enable_flathub|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  https://flathub.org/repo/flathub.flatpakrepo
+  when: flatpak_remote_enable_flathub|bool
 
 - name: Enable Flatpak remote - kdeapps
   flatpak_remote:
     name:             kdeapps
-    state:            "{{ (flatpak_remote_enable_kdeapps|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  https://distribute.kde.org/kdeapps.flatpakrepo
+  when: flatpak_remote_enable_kdeapps|bool
 
 - name: Enable Flatpak remote - flathub-beta
   flatpak_remote:
     name:             flathub-beta
-    state:            "{{ (flatpak_remote_enable_flathub_beta|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  https://flathub.org/beta-repo/flathub-beta.flatpakrepo
+  when: flatpak_remote_enable_flathub_beta|bool
 
 - name: Enable Flatpak remote - gnome-nightly
   flatpak_remote:
     name:             gnome-nightly
-    state:            "{{ (flatpak_remote_enable_gnome_nightly|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  https://nightly.gnome.org/gnome-nightly.flatpakrepo
+  when: flatpak_remote_enable_gnome_nightly|bool
 
 - name: Enable Flatpak remote - eclipse-nightly
   flatpak_remote:
     name:             eclipse-nightly
-    state:            "{{ (flatpak_remote_enable_eclipse_nightly|bool) | ternary('present','absent') }}"
+    state:            present
     flatpakrepo_url:  http://eclipse.matbooth.co.uk/flatpak/nightly/eclipse.flatpakrepo
+  when: flatpak_remote_enable_eclipse_nightly|bool
 
 # -----------------------------------------------------------------------------
 
@@ -114,7 +121,8 @@
     path:   /var/home/{{ username }}/.local/share/themes
     state:  link
     force:  yes
-  become:   "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
 
 - name: Fix displaying of custom themes in Flatpak apps - override
   shell:        flatpak override --show && flatpak override --filesystem=xdg-data/themes

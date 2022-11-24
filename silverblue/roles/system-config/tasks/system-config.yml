@@ -285,13 +285,17 @@
 
 # -----------------------------------------------------------------------------
 
-- name: Create /etc/ipa directory
+- name: Create additional folders in /etc
   file:
-    path:       /etc/ipa
+    path:       "{{ item }}"
     state:      directory
     owner:      root
     group:      root
     mode:       0755
+  with_items:
+    - /etc/ipa
+    - /etc/chromium/policies/managed/
+    - /etc/opt/chrome/policies/managed
 
 - name: Copy Red Hat's internal certificates into /etc
   copy:

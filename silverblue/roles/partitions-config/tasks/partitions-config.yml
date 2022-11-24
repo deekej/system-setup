@@ -13,7 +13,6 @@
 - name: Parse the LUKS partition's UUID from the mount output
   shell:
     cmd: mount | grep -E -m 1 -o -e "^/dev/mapper/luks-[[:alnum:]-]+"
-    warn: false
   register: luks_part_reg
 
 - name: Parse the /boot partition's UUID from mount output
@@ -248,8 +247,7 @@
 
 - name: Check if the reboot is needed
   shell:    mount | grep -m 1 "/var/home/{{ username }}"
-  args:
-    warn:   false
+  failed_when: false
   register: reboot_needed
 
 - name: Rebooting the machine to apply changes (in 10 seconds)

@@ -135,7 +135,8 @@
     path:   /var/home/{{ username }}/.local/share/applications
     state:  link
     force:  yes
-  become:   "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
 
 # ---| root.home |-------------------------------------------------------------
 
@@ -232,8 +233,8 @@
   shell:    ln -sf .config/git/config .gitconfig
   args:
     chdir:  /home/{{ username }}
-    warn:   false
-  become:   "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
 
 # ---| bash.config |-----------------------------------------------------------
 
@@ -244,8 +245,8 @@
   shell:      ln -sf {{ item.target }} {{ item.link }}
   args:
     chdir:    /home/{{ username }}
-    warn:     false
-  become:     "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
   with_items:
     - target: .bash/bashrc
       link:   .bashrc
@@ -268,8 +269,8 @@
   shell:      ln -sf .zsh/zshrc .zshrc
   args:
     chdir:    /home/{{ username }}
-    warn:     false
-  become:     "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
 
 # ---| vim.config |------------------------------------------------------------
 
@@ -280,8 +281,8 @@
   shell:    ln -sf {{ item.target }} {{ item.link }}
   args:
     chdir:    /home/{{ username }}
-    warn:     false
-  become:     "{{ username }}"
+  become:      true
+  become_user: "{{ username }}"
   with_items:
     - target: .vim/vimrc
       link:   .vimrc
@@ -291,13 +292,13 @@
 
 - name: Download additional VIM plugins for {{ username }}
   shell:  echo -e '\n' | vim +PluginInstall +qall
-  become: "{{username}}"
+  become:      true
+  become_user: "{{ username }}"
 
 - name: Restore ownership of /home/{{ username }} folder for {{ username }}
   shell:  chown -R {{ username }}:{{ username }} {{ item }}
   args:
     chdir:  "/home/{{ username }}"
-    warn:   false
   with_items:
     - .bash
     - .config/git
