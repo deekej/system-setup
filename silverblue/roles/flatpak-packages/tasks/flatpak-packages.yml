@@ -121,12 +121,6 @@
   register:     flatpak_override
   changed_when: flatpak_override.stdout | regex_search('filesystems=xdg-data/themes') == none
 
-- name: Fix displaying of tray icon for Telegram Desktop
-  shell:        flatpak override --show org.telegram.desktop && flatpak override --env=QT_QPA_PLATFORM=xcb org.telegram.desktop
-  register:     flatpak_override
-  changed_when: flatpak_override.stdout | regex_search('QT_QPA_PLATFORM=xcb') == none
-  when:       '"org.telegram.desktop" in flatpak_packages_list'
-
 - name: Fix displaying of tray icon for Audacious Music Player
   shell:        flatpak override --show org.atheme.audacious && flatpak override --env=QT_QPA_PLATFORM=xcb org.atheme.audacious
   register:     flatpak_override
