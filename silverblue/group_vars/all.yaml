@@ -93,7 +93,7 @@ packages_extra_work:
 packages_extra_theme:
   - arc-theme
   - breeze-cursor-theme
-  - mint-y-icons
+  - mint-x-icons
 
 packages_extra_codecs:
   - ffmpeg
@@ -181,10 +181,6 @@ gnome_extensions:
   - id:     1604
     enable: no
 
-  # https://extensions.gnome.org/extension/751/audio-output-switcher/
-  - id:     751
-    enable: yes
-
   # https://extensions.gnome.org/extension/1401/bluetooth-quick-connect/
   - id:     1401
     enable: yes
@@ -229,16 +225,8 @@ gnome_extensions:
   - id:     2182
     enable: yes
 
-  # https://extensions.gnome.org/extension/708/panel-osd/
-  - id:     708
-    enable: no
-
   # https://extensions.gnome.org/extension/8/places-status-indicator/
   - id:     8
-    enable: yes
-
-  # https://extensions.gnome.org/extension/905/refresh-wifi-connections/
-  - id:     905
     enable: yes
 
   # https://extensions.gnome.org/extension/112/remove-accesibility/
@@ -253,9 +241,9 @@ gnome_extensions:
   - id:     355
     enable: yes
 
-  ## https://extensions.gnome.org/extension/120/system-monitor/
-  #- id:     120
-  #  enable: yes
+  # https://extensions.gnome.org/extension/3010/system-monitor-next/
+  - id:     3010
+    enable: yes
 
   # https://extensions.gnome.org/extension/701/top-panel-workspace-scroll/
   - id:     701
@@ -279,9 +267,5 @@ gnome_extensions:
 
   # https://extensions.gnome.org/extension/1460/vitals/
   - id:     1460
-    enable: no
-
-  # https://extensions.gnome.org/extension/1485/workspace-matrix/
-  - id:     1485
     enable: no
 
