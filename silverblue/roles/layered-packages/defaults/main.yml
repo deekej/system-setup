@@ -4,7 +4,9 @@
 
 packages_default:
   - ansible
+  - ansible-lint
   - colordiff
+  - code
   - dconf-editor
   - etckeeper
   - gh

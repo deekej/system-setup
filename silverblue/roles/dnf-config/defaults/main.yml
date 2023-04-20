@@ -15,8 +15,10 @@ repos:
   - rpmfusion-nonfree-steam.repo
   - rpmfusion-nonfree-updates.repo
   - rpmfusion-nonfree-updates-testing.repo
+  - vscode.repo
 
 repos_gpg_keys:
   - RPM-GPG-KEY-github
+  - RPM-GPG-KEY-microsoft
   - RPM-GPG-KEY-slaanesh
 
